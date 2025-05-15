@@ -8,7 +8,7 @@ typedef struct {
 int main(int argc, char **argv)  {
   FILE *entrada;
 	Endereco endereco;
-	int qtd, inicio = 0, fim, meio, comparacao;
+	int inicio = 0, fim, meio, comparacao;
 
 	if(argc != 2) {
     fprintf(stderr, "Erro na chamada do comando. \n");
@@ -28,8 +28,8 @@ int main(int argc, char **argv)  {
 	meio = (inicio + fim) / 2;
 	fseek(entrada, meio * sizeof(Endereco), SEEK_SET);
 
-	qtd = fread(&endereco, sizeof(Endereco), 1, entrada);
-	while (inicio <= fim && qtd > 0) {
+	fread(&endereco, sizeof(Endereco), 1, entrada);
+	while (inicio <= fim) {
 		comparacao = strncmp(argv[1], endereco.cep, 8);
 
 		if(comparacao == 0) {
@@ -50,7 +50,7 @@ int main(int argc, char **argv)  {
 
 		meio = (inicio + fim) / 2;
 		fseek(entrada, meio * sizeof(Endereco), SEEK_SET);
-		qtd = fread(&endereco, sizeof(Endereco), 1, entrada);
+		fread(&endereco, sizeof(Endereco), 1, entrada);
 	}
 
 	fclose(entrada);
