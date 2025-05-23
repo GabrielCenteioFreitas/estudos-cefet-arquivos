@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #define MAX 2048
 
@@ -74,6 +75,9 @@ void processa(DadosNascimento* dn) {
 }
 
 int main() {
+  struct timeval inicio, fim;
+  gettimeofday(&inicio, NULL);
+
   char *prox = NULL;
   int limite = 0;
   static char buffer[MAX];
@@ -149,6 +153,11 @@ int main() {
   }
   
   fclose(f);
+
+  gettimeofday(&fim, NULL);
+  double tempo_execucao = (fim.tv_sec - inicio.tv_sec) + 
+                         (fim.tv_usec - inicio.tv_usec) / 1000000.0;
+  printf("\nTempo de execucao: %.4f segundos\n", tempo_execucao);
 
   return 0;
 }
