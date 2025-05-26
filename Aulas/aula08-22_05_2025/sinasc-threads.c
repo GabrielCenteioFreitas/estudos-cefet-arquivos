@@ -12,8 +12,10 @@ typedef struct _HashElement HashElement;
 
 struct _HashElement {
   int uf;
-  float soma;
   int qtd;
+  float somaPesos;
+  int qtdMasc;
+  int qtdFem;
   HashElement *next;
 };
 
@@ -38,26 +40,57 @@ typedef struct {
   int TPROBSON;
 } DadosNascimento;
 
+typedef struct {
+    int codigo;
+    const char *nome;
+} UFInfo;
+
+char* siglasUFs[] = {
+  [11] = "RO", [12] = "AC", [13] = "AM", [14] = "RR", [15] = "PA",
+  [16] = "AP", [17] = "TO", [21] = "MA", [22] = "PI", [23] = "CE",
+  [24] = "RN", [25] = "PB", [26] = "PE", [27] = "AL", [28] = "SE",
+  [29] = "BA", [31] = "MG", [32] = "ES", [33] = "RJ", [35] = "SP",
+  [41] = "PR", [42] = "SC", [43] = "RS", [50] = "MS", [51] = "MT",
+  [52] = "GO", [53] = "DF"
+};
+
 void separaData(char* data, int *dia, int *mes, int *ano) {
   *ano = atoi(strtok(data,"-"));
   *mes = atoi(strtok(NULL,"-"));
   *dia = atoi(strtok(NULL,"-"));
 }
 
+void atualizarSexo(HashElement* atual, int sexo) {
+  switch (sexo) {
+    case 1:
+      atual->qtdMasc++;
+      break;
+    case 2:
+      atual->qtdFem++;
+      break;
+    default:
+      break;
+  }
+}
+
 HashElement tabela[HASH_QNT];
 pthread_mutex_t locks[HASH_QNT]; 
 int qtd, qtdCadaThread, resto;
 
-void acumula(int uf, float peso) {
-  int pos = uf % HASH_QNT;
+void acumula(DadosNascimento* dn) {
+  int uf = dn->CODMUNRES / 10000, 
+    peso = dn->PESO, 
+    sexo = dn->SEXO, 
+    pos = uf % HASH_QNT;
   
   pthread_mutex_lock(&locks[pos]);
   HashElement *atual = &tabela[pos];
 
   while (atual) {
     if (atual->uf == uf) {
-      atual->soma += peso;
+      atual->somaPesos += peso;
       atual->qtd++;
+      atualizarSexo(atual, sexo);
       pthread_mutex_unlock(&locks[pos]);
       return;
     }
@@ -67,7 +100,10 @@ void acumula(int uf, float peso) {
   atual = (HashElement*) malloc(sizeof(HashElement));
   atual->uf = uf;
   atual->qtd = 1;
-  atual->soma = peso;
+  atual->somaPesos = peso;
+  atual->qtdFem = 0;
+  atual->qtdMasc = 0;
+  atualizarSexo(atual, sexo);
   if (tabela[pos].uf == 0) {
     atual->next = NULL;
     tabela[pos] = *atual;
@@ -80,22 +116,34 @@ void acumula(int uf, float peso) {
 }
 
 void processa(DadosNascimento* dn) {
-  int uf = dn->CODMUNRES / 10000;
-  acumula(uf, dn->PESO);
+  acumula(dn);
 }
 
 void printarResultado() {
   HashElement *atual;
-  float media;
+  float media, porcMasc, porcFem;
+  char* sigla;
 
-  printf("%2s | %16s | %8s | %10s |\n", "UF", "Soma", "Qtd", "Media");
-  printf("---|------------------|----------|------------|\n");
+  printf("%2s | %2s | %8s | %6s | %6s | %11s |\n", "CD", "UF", "Qtd", "Sexo M", "Sexo F", "Media Pesos");
+  printf("---|----|----------|--------|--------|-------------|\n");
   for (int i = 0; i < HASH_QNT; i++) {
     if (tabela[i].uf) {
       atual = &tabela[i];
       while (atual) {
-        media = atual->soma / atual->qtd;
-        printf("%2d | %13.2f Kg | %8d | %7.2f Kg |\n", atual->uf, atual->soma / 1000, atual->qtd, media / 1000);
+        media = atual->somaPesos / atual->qtd;
+        porcMasc = ((float) atual->qtdMasc) / atual->qtd;
+        porcFem = ((float) atual->qtdFem) / atual->qtd;
+        sigla = (atual->uf >= 11 && atual->uf <= 53) ? 
+              siglasUFs[atual->uf] : "??";
+
+        printf("%2d | %2s | %8d | %5.2f%% | %5.2f%% | %8.2f Kg |\n", 
+          atual->uf, 
+          sigla,
+          atual->qtd, 
+          porcMasc*100, 
+          porcFem*100, 
+          media / 1000);
+
         atual = atual->next;
       }
     }
@@ -128,6 +176,7 @@ void* executar(void* arg) {
   }
 
   for (i = 0; i < qtdASerLida; i++) {
+  //for (i = 0; i < 1000; i++) {
     if (!fgets(buffer, MAX, f)) break;
 
     linha[0] = strtok_r(buffer, ",\n", &prox);
@@ -175,7 +224,7 @@ int main() {
   for (int i = 0; i < HASH_QNT; i++) {
     tabela[i].uf = 0;
     tabela[i].qtd = 0;
-    tabela[i].soma = 0;
+    tabela[i].somaPesos = 0;
     tabela[i].next = NULL;
     pthread_mutex_init(&locks[i], NULL);
   }
